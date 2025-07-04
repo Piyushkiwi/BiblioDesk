@@ -1,12 +1,14 @@
 package com.application.bibliodesk.controller;
 
+import com.application.bibliodesk.payload.BookDTO;
 import com.application.bibliodesk.entity.Book;
-import com.application.bibliodesk.service.AuthorService;
-import com.application.bibliodesk.service.BookService;
-import com.application.bibliodesk.service.CategoryService;
-import com.application.bibliodesk.service.PublisherService;
+import com.application.bibliodesk.service.serviceImp.AuthorServiceImp;
+import com.application.bibliodesk.service.serviceImp.BookServiceImp;
+import com.application.bibliodesk.service.serviceImp.CategoryServiceImp;
+import com.application.bibliodesk.service.serviceImp.PublisherServiceImp;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
@@ -14,68 +16,76 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/books")
+@RequiredArgsConstructor
 public class BookController {
 
-    @Autowired
-    private BookService bookService;
-    @Autowired
-    private CategoryService categoryService;
-    @Autowired
-    private PublisherService publisherService;
-    @Autowired
-    private AuthorService authorService;
+    private final BookServiceImp bookService;
+    private final CategoryServiceImp categoryService;
+    private final PublisherServiceImp publisherService;
+    private final AuthorServiceImp authorService;
+    private final ModelMapper modelMapper;
 
     @GetMapping
-    public ResponseEntity<List<Book>> getAllBooks() {
-        List<Book> books = bookService.findAllBooks();
-        return new ResponseEntity<>(books, HttpStatus.OK);
+    public ResponseEntity<List<BookDTO>> getAllBooks() {
+        List<BookDTO> books = bookService.findAllBooks().stream()
+                .map(book -> modelMapper.map(book, BookDTO.class))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(books);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Book> getBookById(@PathVariable Long id) {
-        try {
-            Book book = bookService.findBookById(id);
-            return new ResponseEntity<>(book, HttpStatus.OK);
-        } catch (IllegalArgumentException ex) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage());
-        }
+    public ResponseEntity<BookDTO> getBookById(@PathVariable Long id) {
+        Book book = bookService.findBookById(id);
+        BookDTO bookDTO = modelMapper.map(book, BookDTO.class);
+        return ResponseEntity.ok(bookDTO);
     }
 
     @PostMapping
-    public ResponseEntity<?> createBook(@Valid @RequestBody Book book, BindingResult bindingResult) {
+    public ResponseEntity<?> createBook(@Valid @RequestBody BookDTO bookDTO, BindingResult bindingResult) {
         if (bindingResult.hasErrors()) {
-            return new ResponseEntity<>(bindingResult.getAllErrors(), HttpStatus.BAD_REQUEST);
+            Map<String, String> errors = new HashMap<>();
+            bindingResult.getFieldErrors().forEach(error ->
+                    errors.put(error.getField(), error.getDefaultMessage()));
+            return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
         }
+
+        Book book = modelMapper.map(bookDTO, Book.class);
         Book createdBook = bookService.createBook(book);
-        return new ResponseEntity<>(createdBook, HttpStatus.CREATED);
+        BookDTO createdBookDTO = modelMapper.map(createdBook, BookDTO.class);
+
+        return new ResponseEntity<>(createdBookDTO, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateBook(@PathVariable Long id, @Valid @RequestBody Book book, BindingResult bindingResult) {
+    public ResponseEntity<?> updateBook(@PathVariable Long id, @Valid @RequestBody BookDTO bookDTO, BindingResult bindingResult) {
         if (bindingResult.hasErrors()) {
-            return new ResponseEntity<>(bindingResult.getAllErrors(), HttpStatus.BAD_REQUEST);
+            Map<String, String> errors = new HashMap<>();
+            bindingResult.getFieldErrors().forEach(error ->
+                    errors.put(error.getField(), error.getDefaultMessage()));
+            return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
         }
-        if (!id.equals(book.getId())) {
+
+        if (!id.equals(bookDTO.getId())) {
             return new ResponseEntity<>("ID in path does not match ID in request body.", HttpStatus.BAD_REQUEST);
         }
-        try {
-            Book updatedBook = bookService.updateBook(book);
-            return new ResponseEntity<>(updatedBook, HttpStatus.OK);
-        } catch (IllegalArgumentException ex) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage());
-        }
+
+        Book book = modelMapper.map(bookDTO, Book.class);
+        Book updatedBook = bookService.updateBook(book);
+        BookDTO updatedBookDTO = modelMapper.map(updatedBook, BookDTO.class);
+
+        return ResponseEntity.ok(updatedBookDTO);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteBook(@PathVariable Long id) {
-        try {
-            bookService.deleteBook(id);
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        } catch (IllegalArgumentException ex) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage());
-        }
+        bookService.deleteBook(id);
+        return ResponseEntity.noContent().build();
     }
 }

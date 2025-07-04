@@ -1,25 +1,30 @@
 package com.application.bibliodesk.controller;
 
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.userdetails.UserDetails;
+import com.application.bibliodesk.payload.requestDTO.UserRequestDTO;
+import com.application.bibliodesk.payload.responseDTO.UserResponseDTO;
+import com.application.bibliodesk.payload.RegisterUserDTO;
+import com.application.bibliodesk.service.AuthService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/auth")
-public class AuthController {
+@RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
+public class AuthController{
 
-    @Autowired private AuthenticationManager authenticationManager;
-    @Autowired private JwtUtil jwtUtil;
-    @Autowired private CustomUserDetailsService userDetailsService;
+    private final AuthService authenticationService;
 
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody AuthRequest authRequest) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(authRequest.getUsername(), authRequest.getPassword()));
+    @PostMapping("/register")
+    public ResponseEntity<UserResponseDTO> register(@RequestBody RegisterUserDTO request) {
+        return ResponseEntity.ok(authenticationService.register(request));
+    }
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.getUsername());
-        String token = jwtUtil.generateToken(userDetails);
-
-        return ResponseEntity.ok(new AuthResponse(token));
+    @PostMapping("/authenticate")
+    public ResponseEntity<UserResponseDTO> authenticate(@RequestBody UserRequestDTO request) {
+        return ResponseEntity.ok(authenticationService.authenticate(request));
     }
 }
-

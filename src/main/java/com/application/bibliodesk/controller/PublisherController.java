@@ -1,12 +1,13 @@
 package com.application.bibliodesk.controller;
 
-import com.application.bibliodesk.entity.Publisher;
+import com.application.bibliodesk.payload.PublisherDTO;
 import com.application.bibliodesk.service.PublisherService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -18,35 +19,48 @@ public class PublisherController {
     private final PublisherService publisherService;
 
     @GetMapping
-    public ResponseEntity<List<Publisher>> findAllPublishers() {
-        List<Publisher> publishers = publisherService.findAllPublishers();
+    public ResponseEntity<List<PublisherDTO>> findAllPublishers() {
+        List<PublisherDTO> publishers = publisherService.findAllPublishers();
         return ResponseEntity.ok(publishers);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Publisher> findPublisherById(@PathVariable Long id) {
-        Publisher publisher = publisherService.findPublisherById(id);
-        return ResponseEntity.ok(publisher);
+    public ResponseEntity<PublisherDTO> findPublisherById(@PathVariable Long id) {
+        try {
+            PublisherDTO publisher = publisherService.findPublisherById(id);
+            return ResponseEntity.ok(publisher);
+        } catch (RuntimeException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
     }
 
     @PostMapping
-    public ResponseEntity<Publisher> createPublisher(@Valid @RequestBody Publisher publisher) {
-        Publisher createdPublisher = publisherService.createPublisher(publisher); // ✅ fixed typo
-        return new ResponseEntity<>(createdPublisher, HttpStatus.CREATED);
+    public ResponseEntity<PublisherDTO> createPublisher(@Valid @RequestBody PublisherDTO publisherDTO) {
+        PublisherDTO created = publisherService.createPublisher(publisherDTO);
+        return new ResponseEntity<>(created, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Publisher> updatePublisher(@PathVariable Long id, @Valid @RequestBody Publisher publisher) {
-        if (!id.equals(publisher.getId())) {
-            return ResponseEntity.badRequest().build(); // 400 if ID mismatch
+    public ResponseEntity<PublisherDTO> updatePublisher(@PathVariable Long id, @Valid @RequestBody PublisherDTO publisherDTO) {
+        if (!id.equals(publisherDTO.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Path ID does not match request body ID.");
         }
-        Publisher updatedPublisher = publisherService.updatePublisher(publisher);
-        return ResponseEntity.ok(updatedPublisher);
+
+        try {
+            PublisherDTO updated = publisherService.updatePublisher(id, publisherDTO);
+            return ResponseEntity.ok(updated);
+        } catch (RuntimeException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletePublisher(@PathVariable Long id) {
-        publisherService.deletePublisher(id);
-        return ResponseEntity.noContent().build(); // 204 No Content
+        try {
+            publisherService.deletePublisher(id);
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
     }
 }

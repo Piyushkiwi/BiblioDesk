@@ -1,68 +1,70 @@
 package com.application.bibliodesk.controller;
 
 import com.application.bibliodesk.entity.Author;
-import com.application.bibliodesk.service.AuthorService;
+import com.application.bibliodesk.payload.AuthorDTO;
+import com.application.bibliodesk.service.serviceImp.AuthorServiceImp;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/authors")
-@RequiredArgsConstructor // Replaces manual @Autowired with constructor injection
+@RequiredArgsConstructor
 public class AuthorController {
 
-    private final AuthorService authorService;
+    private final AuthorServiceImp authorService;
+    private final ModelMapper modelMapper;
 
-    @GetMapping
-    public ResponseEntity<List<Author>> getAllAuthors() {
-        List<Author> authors = authorService.findAllAuthors();
-        return ResponseEntity.ok(authors);
+    @GetMapping("/all/getAuthor")
+    public ResponseEntity<List<AuthorDTO>> getAllAuthors() {
+        List<AuthorDTO> dtos = authorService.findAllAuthors().stream()
+                .map(author -> {
+                    AuthorDTO dto = modelMapper.map(author, AuthorDTO.class);
+                    Set<Long> bookIds = author.getBooks().stream().map(b -> b.getId()).collect(Collectors.toSet());
+                    dto.setBookIds(bookIds);
+                    return dto;
+                }).collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Author> getAuthorById(@PathVariable Long id) {
+    @GetMapping("/get/AuthorBy/{id}")
+    public ResponseEntity<AuthorDTO> getAuthorById(@PathVariable Long id) {
         Author author = authorService.findAuthorById(id);
-        return ResponseEntity.ok(author);
+        AuthorDTO dto = modelMapper.map(author, AuthorDTO.class);
+        Set<Long> bookIds = author.getBooks().stream().map(b -> b.getId()).collect(Collectors.toSet());
+        dto.setBookIds(bookIds);
+        return ResponseEntity.ok(dto);
     }
 
-    @PostMapping
-    public ResponseEntity<?> createAuthor(@Valid @RequestBody Author author, BindingResult bindingResult) {
-        if (bindingResult.hasErrors()) {
-            Map<String, String> errors = new HashMap<>();
-            bindingResult.getFieldErrors().forEach(error ->
-                    errors.put(error.getField(), error.getDefaultMessage()));
-            return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
-        }
-
-        Author createdAuthor = authorService.createAuthor(author);
-        return new ResponseEntity<>(createdAuthor, HttpStatus.CREATED);
+    @PostMapping("/create/Author")
+    public ResponseEntity<AuthorDTO> createAuthor(@Valid @RequestBody AuthorDTO requestDTO) {
+        Author author = modelMapper.map(requestDTO, Author.class);
+        Author saved = authorService.createAuthor(author);
+        AuthorDTO responseDTO = modelMapper.map(saved, AuthorDTO.class);
+        Set<Long> bookIds = saved.getBooks().stream().map(b -> b.getId()).collect(Collectors.toSet());
+        responseDTO.setBookIds(bookIds);
+        return new ResponseEntity<>(responseDTO, HttpStatus.CREATED);
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<Author> updateAuthor(@PathVariable Long id, @Valid @RequestBody Author author, BindingResult bindingResult) {
-        if (bindingResult.hasErrors()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Validation error: " + bindingResult.getAllErrors());
-        }
-
-        // Make sure author.getId() exists – check that the entity has Lombok's @Getter
-        if (author.getId() == null || !id.equals(author.getId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID in path does not match ID in request body.");
-        }
-
-        authorService.findAuthorById(id); // Ensure exists
-        Author updatedAuthor = authorService.updateAuthor(author);
-        return ResponseEntity.ok(updatedAuthor);
+    @PutMapping("/update/AuthorBy/{id}")
+    public ResponseEntity<AuthorDTO> updateAuthor(@PathVariable Long id, @Valid @RequestBody AuthorDTO requestDTO) {
+        Author existing = authorService.findAuthorById(id);
+        modelMapper.map(requestDTO, existing);
+        Author updated = authorService.updateAuthor(existing);
+        AuthorDTO responseDTO = modelMapper.map(updated, AuthorDTO.class);
+        Set<Long> bookIds = updated.getBooks().stream().map(b -> b.getId()).collect(Collectors.toSet());
+        responseDTO.setBookIds(bookIds);
+        return ResponseEntity.ok(responseDTO);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/delete/AuthorBy/{id}")
     public ResponseEntity<Void> deleteAuthor(@PathVariable Long id) {
         authorService.findAuthorById(id); // Ensure exists
         authorService.deleteAuthor(id);

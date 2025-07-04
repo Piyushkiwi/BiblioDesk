@@ -1,10 +1,24 @@
 package com.application.bibliodesk.entity;
 
-@Entity
-@Table(name = "users")
-public class User {
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+import java.util.Collection;
+import java.util.Collections;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+@Table(name = "app_users")
+public class User implements UserDetails {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(unique = true, nullable = false)
@@ -13,7 +27,20 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    private String role = "ROLE_USER"; // or ROLE_ADMIN
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return Collections.emptyList(); // No specific roles needed as per your request (single user type)
+    }
 
-    // Getters, setters, constructors
+    @Override
+    public boolean isAccountNonExpired() { return true; }
+
+    @Override
+    public boolean isAccountNonLocked() { return true; }
+
+    @Override
+    public boolean isCredentialsNonExpired() { return true; }
+
+    @Override
+    public boolean isEnabled() { return true; }
 }
