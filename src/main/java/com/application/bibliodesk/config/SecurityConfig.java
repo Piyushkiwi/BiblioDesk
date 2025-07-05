@@ -11,6 +11,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -24,22 +25,13 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity  // ✅ Enables @PreAuthorize and related annotations
 @RequiredArgsConstructor
+public class SecurityConfig {
 
-public class SecurityConfig{
-
-    // These are still injected as they are components or services
-//    private  final JwtAuthenticationFilter jwtAuthFilter;
     private final JwtUtil jwtUtil;
-    private  final JwtAuthEntryPoint unauthorizedHandler;
+    private final JwtAuthEntryPoint unauthorizedHandler;
     private final UserRepository userRepository;
-
-    // --- Beans moved from ApplicationConfig ---
-
-    @Bean
-    public JwtAuthenticationFilter jwtAuthFilter(JwtUtil jwtUtil, UserDetailsService userDetailsService) {
-        return new JwtAuthenticationFilter(jwtUtil, userDetailsService);
-    }
 
     @Bean
     public UserDetailsService userDetailsService() {
@@ -48,10 +40,15 @@ public class SecurityConfig{
     }
 
     @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService()); // Uses the local userDetailsService bean
-        authProvider.setPasswordEncoder(passwordEncoder());       // Uses the local passwordEncoder bean
+        authProvider.setUserDetailsService(userDetailsService());
+        authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
 
@@ -61,12 +58,9 @@ public class SecurityConfig{
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    public JwtAuthenticationFilter jwtAuthFilter() {
+        return new JwtAuthenticationFilter(jwtUtil, userDetailsService());
     }
-
-    // --- End of Beans moved from ApplicationConfig ---
-
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -74,17 +68,15 @@ public class SecurityConfig{
                 .csrf(AbstractHttpConfigurer::disable)
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/v1/auth/authenticate", "/api/v1/auth/register").permitAll()
+                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/authenticate").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                // Use the authenticationProvider defined within this class
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter(jwtUtil, userDetailsService()), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 }
-

@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/authors")
 @RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()") // ✅ Secure all endpoints
 public class AuthorController {
 
     private final AuthorServiceImp authorService;
@@ -55,8 +57,8 @@ public class AuthorController {
 
     @PutMapping("/update/AuthorBy/{id}")
     public ResponseEntity<AuthorDTO> updateAuthor(@PathVariable Long id, @Valid @RequestBody AuthorDTO requestDTO) {
-        Author existing = authorService.findAuthorById(id);
-        modelMapper.map(requestDTO, existing);
+        Author existing = authorService.findAuthorById(id); // load full author with books
+        modelMapper.map(requestDTO, existing); // update fields
         Author updated = authorService.updateAuthor(existing);
         AuthorDTO responseDTO = modelMapper.map(updated, AuthorDTO.class);
         Set<Long> bookIds = updated.getBooks().stream().map(b -> b.getId()).collect(Collectors.toSet());
@@ -65,9 +67,9 @@ public class AuthorController {
     }
 
     @DeleteMapping("/delete/AuthorBy/{id}")
-    public ResponseEntity<Void> deleteAuthor(@PathVariable Long id) {
-        authorService.findAuthorById(id); // Ensure exists
+    public ResponseEntity<String> deleteAuthor(@PathVariable Long id) {
+        authorService.findAuthorById(id); // ensure exists
         authorService.deleteAuthor(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok("Author deleted successfully.");
     }
 }
